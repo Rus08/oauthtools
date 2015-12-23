@@ -264,6 +264,7 @@ char* oat_create_signature(struct OAuthParams* params, char* base_url, char* htt
 {
 	char* out_str;
 	char** param_array;
+	char* param_to_free[6];
 	char* param_string;
 	char* signature_string;
 	char* key_string;
@@ -312,6 +313,10 @@ char* oat_create_signature(struct OAuthParams* params, char* base_url, char* htt
 
 	param_array[5] = (char*)malloc(sizeof("oauth_version=1.0") + 1);
 	strcpy(param_array[5], "oauth_version=1.0");
+
+	for(uint32_t i = 0; i < 6; i++){
+		param_to_free[i] = param_array[i];
+	}
 
 	if(query_params_num != 0){
 		// perform sorting
@@ -396,12 +401,11 @@ char* oat_create_signature(struct OAuthParams* params, char* base_url, char* htt
 	params->signature = oat_url_escape(temp);
 	out_str = params->signature;
 
-	if(query_params_num > 0 && query_params != NULL){
-		for(uint32_t i = 0; i < query_params_num; i++){
-			free(param_array[i]);
-		}
-		free(param_array);
+	for(uint32_t i = 0; i < 6; i++){
+		free(param_to_free[i]);
 	}
+	free(param_array);
+	
 	free(param_string_raw);
 	free(signature_string);
 	free(key_string);
