@@ -114,7 +114,7 @@ char *oauth_sign_hmac_sha1 (const char *m, const char *k);
 * @return encoded string otherwise NULL
 * The caller must free the returned string.
 */
-char* oat_url_escape(char* string)
+char* oat_url_escape(const char* string)
 {
 	uint32_t size;
 	char* out_str = 0;
@@ -140,11 +140,11 @@ char* oat_url_escape(char* string)
 		// ch: first 3 bytes - char data, last byte data size 1 or 3 chars
 		uint32_t ch = percentage_table[(uint8_t)string[i]];
 
-		if((ch >> 24) == 1){
-			out_str[out_size] = ch & 0xff;
-		}else{
+		//if((ch >> 24) == 1){
+		//	out_str[out_size] = ch & 0xff;
+		//}else{
 			*(uint32_t*)&out_str[out_size] = ch;
-		}
+		//}
 		out_size = out_size + (ch >> 24);
 	}
 
