@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
+#include "oauthtools.h"
 
 
 
@@ -43,7 +44,7 @@ for(uint32_t i = 0; i < 256; i++){
 fclose(fp);
 */
 
-const uint32_t percentage_table[256] = {
+const uint32_t percentage_table[256] = { // little endian
 	0x03303025, 0x03313025, 0x03323025, 0x03333025, 0x03343025, 0x03353025, 0x03363025, 0x03373025, 
 	0x03383025, 0x03393025, 0x03413025, 0x03423025, 0x03433025, 0x03443025, 0x03453025, 0x03463025, 
 	0x03303125, 0x03313125, 0x03323125, 0x03333125, 0x03343125, 0x03353125, 0x03363125, 0x03373125, 
@@ -78,20 +79,97 @@ const uint32_t percentage_table[256] = {
 	0x03384625, 0x03394625, 0x03414625, 0x03424625, 0x03434625, 0x03444625, 0x03454625, 0x03464625, 
 };
 
-const char chars[] = { "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_" };
+// for oat_get_nonce() 
+const char chars[] = { "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_"\
+"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_abcd" };
 
-struct OAuthParams{
-	char* consumer_key;
-	char* nonce;
-	char* signature;
-	char* signature_method;
-	char* timestamp;
-	char* token;
-	char* version;
-	char* consumer_secret;
-	char* secret;
+// for u32toa
+const char gDigitsLut[200] = {
+	'0','0','0','1','0','2','0','3','0','4','0','5','0','6','0','7','0','8','0','9',
+	'1','0','1','1','1','2','1','3','1','4','1','5','1','6','1','7','1','8','1','9',
+	'2','0','2','1','2','2','2','3','2','4','2','5','2','6','2','7','2','8','2','9',
+	'3','0','3','1','3','2','3','3','3','4','3','5','3','6','3','7','3','8','3','9',
+	'4','0','4','1','4','2','4','3','4','4','4','5','4','6','4','7','4','8','4','9',
+	'5','0','5','1','5','2','5','3','5','4','5','5','5','6','5','7','5','8','5','9',
+	'6','0','6','1','6','2','6','3','6','4','6','5','6','6','6','7','6','8','6','9',
+	'7','0','7','1','7','2','7','3','7','4','7','5','7','6','7','7','7','8','7','9',
+	'8','0','8','1','8','2','8','3','8','4','8','5','8','6','8','7','8','8','8','9',
+	'9','0','9','1','9','2','9','3','9','4','9','5','9','6','9','7','9','8','9','9'
 };
 
+// https://github.com/miloyip/itoa-benchmark
+
+inline void u32toa(uint32_t value, char* buffer) {
+	/*if (value < 10000) {
+		const uint32_t d1 = (value / 100) << 1;
+		const uint32_t d2 = (value % 100) << 1;
+
+		if (value >= 1000)
+			*buffer++ = gDigitsLut[d1];
+		if (value >= 100)
+			*buffer++ = gDigitsLut[d1 + 1];
+		if (value >= 10)
+			*buffer++ = gDigitsLut[d2];
+		*buffer++ = gDigitsLut[d2 + 1];
+	}
+	else if (value < 100000000) {
+		// value = bbbbcccc
+		const uint32_t b = value / 10000;
+		const uint32_t c = value % 10000;
+
+		const uint32_t d1 = (b / 100) << 1;
+		const uint32_t d2 = (b % 100) << 1;
+
+		const uint32_t d3 = (c / 100) << 1;
+		const uint32_t d4 = (c % 100) << 1;
+
+		if (value >= 10000000)
+			*buffer++ = gDigitsLut[d1];
+		if (value >= 1000000)
+			*buffer++ = gDigitsLut[d1 + 1];
+		if (value >= 100000)
+			*buffer++ = gDigitsLut[d2];
+		*buffer++ = gDigitsLut[d2 + 1];
+
+		*buffer++ = gDigitsLut[d3];
+		*buffer++ = gDigitsLut[d3 + 1];
+		*buffer++ = gDigitsLut[d4];
+		*buffer++ = gDigitsLut[d4 + 1];
+	}
+	else */{ // since we printing only timestamps
+		// value = aabbbbcccc in decimal
+
+		const uint32_t a = value / 100000000; // 1 to 42
+		value %= 100000000;
+
+		if (a >= 10) {
+			const unsigned i = a << 1;
+			*buffer++ = gDigitsLut[i];
+			*buffer++ = gDigitsLut[i + 1];
+		}
+		else
+			*buffer++ = '0' + (uint8_t)a;
+
+		const uint32_t b = value / 10000; // 0 to 9999
+		const uint32_t c = value % 10000; // 0 to 9999
+
+		const uint32_t d1 = (b / 100) << 1;
+		const uint32_t d2 = (b % 100) << 1;
+
+		const uint32_t d3 = (c / 100) << 1;
+		const uint32_t d4 = (c % 100) << 1;
+
+		*buffer++ = gDigitsLut[d1];
+		*buffer++ = gDigitsLut[d1 + 1];
+		*buffer++ = gDigitsLut[d2];
+		*buffer++ = gDigitsLut[d2 + 1];
+		*buffer++ = gDigitsLut[d3];
+		*buffer++ = gDigitsLut[d3 + 1];
+		*buffer++ = gDigitsLut[d4];
+		*buffer++ = gDigitsLut[d4 + 1];
+	}
+	*buffer++ = '\0';
+}
 
 /**
 * returns base64 encoded HMAC-SHA1 signature for
@@ -170,8 +248,12 @@ char* oat_get_nonce()
 		return NULL;
 	}
 
+	for(uint32_t i = 0; i < (nonce_len + 1) / 2; i++){
+		((uint16_t*)out_str)[i] = rand();
+	}
+
 	for(uint32_t i = 0; i < nonce_len; i++){
-		out_str[i] = chars[rand() % sizeof(chars)]; 
+		out_str[i] = chars[(uint8_t)out_str[i]]; 
 	}
 
 	out_str[nonce_len] = 0;
@@ -183,7 +265,7 @@ char* oat_get_timestamp()
 	char* out_str;
 
 	out_str = (char*)malloc(16); // max for 32 bit is 10 digits
-	sprintf(out_str, "%u", (uint32_t)time(NULL));
+	u32toa((uint32_t)time(NULL), out_str);
 
 	return out_str;
 }
@@ -260,6 +342,18 @@ char** oat_create_query_array(char* query_string, uint32_t* param_size)
 	return out_array;
 }
 
+/**
+* Create OAuth signature
+* http://oauth.net/core/1.0/#encoding_parameters.
+*
+* @param params pointer to OAuthParams struct, with consumer_key, consumer_token fullfield
+* @param base_url string containing only url of access resource without query parameters
+* @param http_method string containing "GET" or "POST", depends on method you want to use
+* @param query_params_num number of query parameters
+* @param query_params array of strings containing query parameters in format "name=value", where name and value are url-encoded and "=" is NOT, if no params should be NULL
+* @return encoded string otherwise NULL
+* Signature also saved to params->signature. The caller must free the returned string.
+*/
 char* oat_create_signature(struct OAuthParams* params, char* base_url, char* http_method, uint32_t query_params_num, char** query_params)
 {
 	char* out_str;
@@ -413,6 +507,13 @@ char* oat_create_signature(struct OAuthParams* params, char* base_url, char* htt
 	return out_str;
 }
 
+/**
+* Create HTTP authorization flags 
+*
+* @param params pointer to OAuthParams struct with all fields fullfield
+* @return string containing HTTP authorization flags WITHOUT CRLF otherwise NULL
+* The caller must free the returned string.
+*/
 char* oat_create_http_flags(struct OAuthParams* params)
 {
 	uint32_t size = sizeof("Authorization: OAuth ");
